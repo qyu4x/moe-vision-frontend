@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Streaming App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: url('');
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+        }
+        header {
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            padding-top: 30px;
+            min-height: 70px;
+            border-bottom: #77c7f7 3px solid;
+        }
+        header a {
+            color: #fff;
+            text-decoration: none;
+            text-transform: uppercase;
+            font-size: 16px;
+        }
+        header ul {
+            padding: 0;
+            list-style: none;
+        }
+        header li {
+            float: right;
+            display: inline;
+            padding: 0 20px 0 20px;
+        }
+        header h1 {
+            float: left;
+        }
+        .main {
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            margin-top: 20px;
+        }
+        .stream-item {
+            background: #fff;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+        .stream-item h2 {
+            margin: 0;
+            padding: 0;
+        }
+        .stream-item button {
+            background: #77c7f7;
+            border: 0;
+            color: #fff;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .video-container {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        #new-stream-token {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="container">
+        <h1>Moe Vision</h1>
+        <ul>
+            <li><a href="#" id="create-stream">Create Stream</a></li>
+        </ul>
+    </div>
+</header>
+<div class="container">
+    <div class="main">
+        <div id="stream-list"></div>
+        <div class="video-container" id="video-container">
+            <h2 id="video-title"></h2>
+            <video id="video" controls width="600" height="400"></video>
+        </div>
+        <div id="new-stream-token">
+            <h2>New Stream Created</h2>
+            <p id="stream-token"></p>
+        </div>
+        <div id="end-stream">
+            <h2>End Stream</h2>
+            <input type="text" id="stream-id-input" placeholder="Enter Stream ID">
+            <button onclick="endStream()">End Stream</button>
+        </div>
+    </div>
+</div>
+
+<!-- Include hls.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const streamList = document.getElementById('stream-list');
+        const videoContainer = document.getElementById('video-container');
+        const video = document.getElementById('video');
+        const videoTitle = document.getElementById('video-title');
+        const newStreamToken = document.getElementById('new-stream-token');
+        const streamToken = document.getElementById('stream-token');
+
+        fetch('http://152.42.164.96:8080/api/v1/lives')
+            .then(response => response.json())
+            .then(data => {
+                const streams = data.data;
+                streams.forEach(stream => {
+                    if (stream.isStreamActive) {
+                        const streamItem = document.createElement('div');
+                        streamItem.className = 'stream-item';
+                        streamItem.innerHTML = `
+                                <h2>${stream.title}</h2>
+                                <p>By: ${stream.fullName}</p>
+                                <button onclick="playStream('${stream.hlsURL}', '${stream.title}')">Watch Now</button>
+                            `;
+                        streamList.appendChild(streamItem);
+                    }
+                });
+            });
+
+        window.playStream = (url, title) => {
+            videoContainer.style.display = 'block';
+            videoTitle.innerText = title;
+
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play();
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => {
+                    video.play();
+                });
+            } else {
+                console.error('HLS not supported in this browser.');
+            }
+        };
+
+        // Create new stream function
+        document.getElementById('create-stream').addEventListener('click', () => {
+            const fullName = prompt('Enter your full name:');
+            const title = prompt('Enter the stream title:');
+
+            if (fullName && title) {
+                fetch('http://152.42.164.96:8080/api/v1/lives', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fullName: fullName,
+                        title: title
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        const id = data.data.id;
+                        const token = data.data.token;
+                        alert(`Stream created successfully!\nToken: ${token}?token=${token} \n ID Live Streaming: ${id}`);
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        });
+
+        // Function to end stream
+        window.endStream = () => {
+            const streamIdInput = document.getElementById('stream-id-input');
+            const streamId = streamIdInput.value.trim();
+
+            if (streamId) {
+                fetch(`http://152.42.164.96:8080/api/v1/lives/${streamId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        isStreamActive: false
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert('Stream ended successfully!');
+                        location.reload();
+                    })
+                    .catch(error => console.error('Error:', error));
+            } else {
+                alert('Please enter a valid Stream ID.');
+            }
+        };
+    });
+</script>
+</body>
+</html>
+
+
+
+
