@@ -192,7 +192,7 @@
                     .then(data => {
                         const id = data.data.id;
                         const token = data.data.token;
-                        alert(`Stream created successfully!\nToken: ${token}?token=${token} \n ID Live Streaming: ${id}`);
+                        alert(`Stream created successfully!\n-----\nServer: rtmp://152.42.164.96/live\nStream Key: ${token}?token=${token}\nID Live Streaming: ${id}`);
                     })
                     .catch(error => console.error('Error:', error));
             }
